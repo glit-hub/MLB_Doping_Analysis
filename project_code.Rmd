@@ -1,0 +1,36 @@
+---
+title: "Project_code"
+author: "Yash Anand, Glit Hanpanitkitkan, Advait Bhargav"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(stringi)
+```
+
+```{r}
+data = read.csv("mlb_season_data.csv")
+head(data)
+```
+
+
+```{r}
+summary(data)
+```
+```{r}
+data = data %>%
+  mutate(across(c(first_name, last_name), ~stri_trans_general(., "latin-ascii"))) %>% 
+  mutate(name = paste(first_name, last_name), .after = season) %>% 
+  mutate(player_id = str_extract(link, "\\d+"), .before = name) %>% 
+  filter(season >= 2010) %>% 
+  select(!c(first_name, last_name, link))
+```
+
+```{r}
+
+```
+
+
