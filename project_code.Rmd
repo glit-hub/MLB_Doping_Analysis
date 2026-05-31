@@ -11,6 +11,7 @@ library(tidyverse)
 library(stringi)
 library(knitr)
 library(baseballr)
+library(MASS)
 ```
 
 
@@ -162,4 +163,18 @@ kable(top_hr, caption = "Top 10 single-season HR totals in the sample.",
 ```
 
 
+# Model Summary
+
+Because we want to fit a model on regression for count outcomes, our first thought is to fit a Poisson regression. However, this regression assumes equidispersion where the mean and variance of the outcome variable should be roughly equal to each other.
+
+```{r}
+mean(data_batters$homeruns)
+var(data_batters$homeruns)
+```
+
+We can see that there is a big difference the mean and variance, where the variance the mean squared. This proves that there is overdispersion. As a result, we should switch to a negative binomial model, which is an extension of the poisson regression designed specifically to handle overdispersion.
+
+Recall that in poisson distribution, $\text{Variance } = \text{Mean}(\mu)$ where $\mu$ is the expected mean count.
+
+In the negative binomial model, $\text{Variance } = \mu + \alpha\mu^2$ where $\alpha$ is the dispersion parameter.
 
