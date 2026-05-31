@@ -9,13 +9,21 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(stringi)
+library(knitr)
+library(baseballr)
 ```
+
+
+The MLB doping era refers to a period from the 1980s to the late 2000s when widespread use of performance-enhancing drugs (PEDs) significantly inflated offensive statistics, notably home run records.
+
+In the research paper by Glynn and Tokdar, they looked at MLB home-run data provided by Lahman's database from 1990-2014.
+
+Now, we want to extend this study by looking at data beyond 2014. We will be looking at MLB data from 2010-2024 courtesy from Kaggle.
 
 ```{r}
 data = read.csv("mlb_season_data.csv")
 head(data)
 ```
-
 
 ```{r}
 summary(data)
@@ -25,12 +33,133 @@ data = data %>%
   mutate(across(c(first_name, last_name), ~stri_trans_general(., "latin-ascii"))) %>% 
   mutate(name = paste(first_name, last_name), .after = season) %>% 
   mutate(player_id = str_extract(link, "\\d+"), .before = name) %>% 
+  mutate(player_id = as.numeric(player_id)) %>% 
   filter(season >= 2010) %>% 
   select(!c(first_name, last_name, link))
 ```
 
-```{r}
+We don't have the age of each player in which was used to model the expected aging curve of a player’s home run production. Therefore, we need to first find a way to add the player's age for that season using another dataset and the baseballr package.
 
+```{r, warning=FALSE, message=FALSE}
+chadwick = chadwick_player_lu()
+id_map = chadwick %>%
+  select(key_mlbam, birth_year) %>%
+  filter(!is.na(key_mlbam))
+
+data = data %>% 
+  left_join(id_map, by = c("player_id" = "key_mlbam")) %>% 
+  mutate(age = season - birth_year)
 ```
+
+# Data Summary
+```{r}
+summary(data)
+```
+
+```{r}
+nrows = nrow(data)
+nplayers = length(unique(data$player_id))
+year_range = range(data$season, na.rm = TRUE)
+
+summary_tbl = data.frame(
+  Quantity = c("Player-seasons", "Unique players", "Season range",
+               "Mean HR", "Median HR", "Max HR"))
+
+Value = c(
+    format(nrows, big.mark = ","),
+    format(nplayers, big.mark = ","),
+    paste(year_range, collapse = "-"),
+    sprintf("%.2f", mean(data$homeruns, na.rm = TRUE)),
+    sprintf("%.0f",  median(data$homeruns, na.rm = TRUE)),
+    sprintf("%.0f",  max(data$homeruns, na.rm = TRUE))
+  )
+summary_tbl = summary_tbl %>% 
+  mutate(" " = Value)
+kable(summary_tbl, caption = "Dataset overview.")
+```
+This is every player. Recall that most players only pitch or not/rarely bat at all. Some players could also be off the bench players who did not play much, so there is not that much data behind them. Recall that an average starting in the MLB gets about 500-700 plate appearances in an MLB season. Therefore we should only look at players who bat at least 50 times in a season and analyze their home-run data from that.
+
+```{r}
+data_batters = data %>% 
+  filter(at_bats > 50)
+```
+
+Now let's plot a histogram distribution of player homeruns in a season from 2010-2024.
+
+```{r}
+hist(data_batters$homeruns, 
+     breaks = 20, 
+     main = "Histogram of Player Homeruns in a Season (2010-2024)",
+     xlab = "Homeruns",
+     col = "lightblue"
+     )
+```
+Let's see the data summaries again for only players with 50+ plate appearances in a season from 2010-2024.
+```{r}
+nrows = nrow(data_batters)
+nplayers = length(unique(data_batters$player_id))
+year_range = range(data_batters$season, na.rm = TRUE)
+
+summary_tbl = data.frame(
+  Quantity = c("Player-seasons", "Unique players", "Season range",
+               "Mean HR", "Median HR", "Max HR"))
+
+Value = c(
+    format(nrows, big.mark = ","),
+    format(nplayers, big.mark = ","),
+    paste(year_range, collapse = "-"),
+    sprintf("%.2f", mean(data_batters$homeruns, na.rm = TRUE)),
+    sprintf("%.0f",  median(data_batters$homeruns, na.rm = TRUE)),
+    sprintf("%.0f",  max(data_batters$homeruns, na.rm = TRUE))
+  )
+summary_tbl = summary_tbl %>% 
+  mutate(" " = Value)
+kable(summary_tbl, caption = "Dataset overview.")
+```
+
+# Exploratory Analysis
+
+```{r}
+ggplot(data_batters, aes(x = factor(season), y = homeruns)) +
+  geom_boxplot(outlier.size = 0.6, fill = "lightblue") +
+  labs(title = "Homeruns by season", x = "Season", y = "Home runs") +
+  theme_bw()
+```
+
+```{r}
+data_batters %>%
+  group_by(season) %>%
+  summarise(mean_HR = mean(homeruns, na.rm = TRUE),
+            mean_AB = mean(at_bats, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(season, mean_HR)) +
+  geom_line() + 
+  geom_point() +
+  coord_cartesian(ylim = c(0, NA)) +
+  scale_x_continuous(breaks = year_range[1]:year_range[2]) +
+  labs(title = "Average Homeruns by Player-Season",
+       x = "Season",
+       y = "Mean HR per player-season") +
+  theme_bw()
+```
+There is an increasing trend in average home runs per player-season from 2014 to 2019.
+
+Recall that there was a historic home run surge from 2014 to 2019 was driven by a major alteration in the manufacturing of the baseball (reducing aerodynamic drag) and an analytical shift in player hitting styles toward higher launch angles.
+
+Notice that in 2020, there is a big drop in average home runs. The reason for this is that 2020 was the COVID season where only roughly 60 games were played instead of the typical 162 game season.
+
+A key concern with when trying to identify abnormal home run production relative to a baseline expectation, but the baseline level of home run production may vary substantially across seasons due to league-wide factors. For example, changes in the baseball, rule changes, and shortened seasons can shift overall home run rates in ways that are unrelated to an individual player’s underlying ability or performance. If these season-level effects are not accounted for, the model may incorrectly classify players as abnormal simply because they played in a season with unusually high league-wide home run production. In particular, hitters in a season such as 2019 may appear abnormal not only because of their individual performance, but also because the entire league experienced elevated home run totals. Therefore, league wide HR changes (ball composition, rule changes) might be confounders for individual abnormality detection.
+
+```{r}
+top_hr = data_batters %>%
+  arrange(desc(homeruns)) %>%
+  select(season, name, team, age, at_bats, homeruns,
+         batting_average, on_base_plus_slugging) %>%
+  head(10)
+kable(top_hr, caption = "Top 10 single-season HR totals in the sample.",
+      digits = 3,
+      col.names = c("Season", "Name", "Team", "Age",
+                    "At Bats", "Homeruns", "Average", "OPS"))
+```
+
 
 
