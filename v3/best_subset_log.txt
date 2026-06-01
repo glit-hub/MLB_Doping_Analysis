@@ -1,0 +1,153 @@
+Dataset: 2,337 player-seasons
+Candidates: 15  |  Subsets: 2^15 - 1 = 32,767
+
+Fitting 32,767 NB2 models …
+
+  Size  1: best AIC = 15116.76,  best BIC = 15134.03
+  Size  2: best AIC = 15051.12,  best BIC = 15074.15
+  Size  3: best AIC = 15017.31,  best BIC = 15046.09
+    1000/32,767  ( 3.1%)  elapsed 0.4 min  ~13.3 min remaining  best AIC so far: 14936.08
+  Size  4: best AIC = 14936.08,  best BIC = 14970.62
+    2000/32,767  ( 6.1%)  elapsed 0.9 min  ~13.9 min remaining  best AIC so far: 14908.98
+    3000/32,767  ( 9.2%)  elapsed 1.4 min  ~14.2 min remaining  best AIC so far: 14908.98
+    4000/32,767  (12.2%)  elapsed 2.0 min  ~14.1 min remaining  best AIC so far: 14908.98
+  Size  5: best AIC = 14908.98,  best BIC = 14949.28
+    5000/32,767  (15.3%)  elapsed 2.5 min  ~14.1 min remaining  best AIC so far: 14881.30
+    6000/32,767  (18.3%)  elapsed 3.1 min  ~13.9 min remaining  best AIC so far: 14881.30
+    7000/32,767  (21.4%)  elapsed 3.7 min  ~13.6 min remaining  best AIC so far: 14881.30
+    8000/32,767  (24.4%)  elapsed 4.3 min  ~13.3 min remaining  best AIC so far: 14881.30
+    9000/32,767  (27.5%)  elapsed 4.9 min  ~13.0 min remaining  best AIC so far: 14881.30
+  Size  6: best AIC = 14881.30,  best BIC = 14927.36
+   10000/32,767  (30.5%)  elapsed 5.5 min  ~12.6 min remaining  best AIC so far: 14875.73
+   11000/32,767  (33.6%)  elapsed 6.1 min  ~12.1 min remaining  best AIC so far: 14862.44
+   12000/32,767  (36.6%)  elapsed 6.8 min  ~11.8 min remaining  best AIC so far: 14862.44
+   13000/32,767  (39.7%)  elapsed 7.5 min  ~11.3 min remaining  best AIC so far: 14862.44
+   14000/32,767  (42.7%)  elapsed 8.1 min  ~10.9 min remaining  best AIC so far: 14862.44
+   15000/32,767  (45.8%)  elapsed 8.8 min  ~10.4 min remaining  best AIC so far: 14862.44
+   16000/32,767  (48.8%)  elapsed 9.4 min  ~9.9 min remaining  best AIC so far: 14862.44
+  Size  7: best AIC = 14862.44,  best BIC = 14914.25
+   17000/32,767  (51.9%)  elapsed 10.1 min  ~9.4 min remaining  best AIC so far: 14846.04
+   18000/32,767  (54.9%)  elapsed 10.8 min  ~8.9 min remaining  best AIC so far: 14846.04
+   19000/32,767  (58.0%)  elapsed 11.5 min  ~8.4 min remaining  best AIC so far: 14846.04
+   20000/32,767  (61.0%)  elapsed 12.3 min  ~7.9 min remaining  best AIC so far: 14846.04
+   21000/32,767  (64.1%)  elapsed 13.0 min  ~7.3 min remaining  best AIC so far: 14846.04
+   22000/32,767  (67.1%)  elapsed 13.8 min  ~6.7 min remaining  best AIC so far: 14846.04
+  Size  8: best AIC = 14846.04,  best BIC = 14903.61
+   23000/32,767  (70.2%)  elapsed 14.5 min  ~6.2 min remaining  best AIC so far: 14844.22
+   24000/32,767  (73.2%)  elapsed 15.3 min  ~5.6 min remaining  best AIC so far: 14835.69
+   25000/32,767  (76.3%)  elapsed 16.0 min  ~5.0 min remaining  best AIC so far: 14833.08
+   26000/32,767  (79.3%)  elapsed 16.8 min  ~4.4 min remaining  best AIC so far: 14833.08
+   27000/32,767  (82.4%)  elapsed 17.5 min  ~3.7 min remaining  best AIC so far: 14833.08
+  Size  9: best AIC = 14833.08,  best BIC = 14896.40
+   28000/32,767  (85.5%)  elapsed 18.3 min  ~3.1 min remaining  best AIC so far: 14833.08
+   29000/32,767  (88.5%)  elapsed 19.1 min  ~2.5 min remaining  best AIC so far: 14819.12
+   30000/32,767  (91.6%)  elapsed 19.9 min  ~1.8 min remaining  best AIC so far: 14819.12
+  Size 10: best AIC = 14819.12,  best BIC = 14888.20
+   31000/32,767  (94.6%)  elapsed 20.7 min  ~1.2 min remaining  best AIC so far: 14816.21
+   32000/32,767  (97.7%)  elapsed 21.5 min  ~0.5 min remaining  best AIC so far: 14815.21
+  Size 11: best AIC = 14815.21,  best BIC = 14890.05
+  Size 12: best AIC = 14809.46,  best BIC = 14890.06
+  Size 13: best AIC = 14805.67,  best BIC = 14892.02
+  Size 14: best AIC = 14806.20,  best BIC = 14898.30
+  Size 15: best AIC = 14808.09,  best BIC = 14905.95
+
+Done. 32,767 models in 22.2 min (40.7 ms/model)
+
+Best AIC = 14805.67  (13 predictors)
+  ['k_percent_lag', 'bb_percent_lag', 'xslg_lag', 'xwobacon_lag', 'exit_velocity_avg_lag', 'barrel_batted_rate_lag', 'solidcontact_percent_lag', 'hard_hit_percent_lag', 'avg_best_speed_lag', 'avg_hyper_speed_lag', 'swing_percent_lag', 'sprint_speed_lag', 'age2']
+
+Best BIC = 14888.20  (10 predictors)
+  ['k_percent_lag', 'bb_percent_lag', 'xslg_lag', 'xwobacon_lag', 'barrel_batted_rate_lag', 'solidcontact_percent_lag', 'avg_best_speed_lag', 'avg_hyper_speed_lag', 'sprint_speed_lag', 'age2']
+
+── Best-AIC NB2 summary ────────────────────────────────────────────────
+                     NegativeBinomial Regression Results                      
+==============================================================================
+Dep. Variable:               home_run   No. Observations:                 2337
+Model:               NegativeBinomial   Df Residuals:                     2323
+Method:                           MLE   Df Model:                           13
+Date:                Sun, 31 May 2026   Pseudo R-squ.:                 0.07877
+Time:                        20:29:09   Log-Likelihood:                -7387.8
+converged:                       True   LL-Null:                       -8019.5
+Covariance Type:            nonrobust   LLR p-value:                4.178e-262
+============================================================================================
+                               coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------
+Intercept                   -0.5799      2.373     -0.244      0.807      -5.231       4.072
+k_percent_lag                0.0350      0.004      8.847      0.000       0.027       0.043
+bb_percent_lag               0.0160      0.004      4.553      0.000       0.009       0.023
+xslg_lag                     5.2606      0.600      8.768      0.000       4.085       6.436
+xwobacon_lag                -6.8750      0.679    -10.127      0.000      -8.206      -5.544
+exit_velocity_avg_lag        0.0297      0.010      3.054      0.002       0.011       0.049
+barrel_batted_rate_lag       0.0225      0.005      4.097      0.000       0.012       0.033
+solidcontact_percent_lag     0.0225      0.004      5.241      0.000       0.014       0.031
+hard_hit_percent_lag        -0.0099      0.003     -2.915      0.004      -0.017      -0.003
+avg_best_speed_lag           0.1844      0.023      7.893      0.000       0.139       0.230
+avg_hyper_speed_lag         -0.2504      0.050     -5.049      0.000      -0.348      -0.153
+swing_percent_lag            0.0052      0.002      2.408      0.016       0.001       0.009
+sprint_speed_lag            -0.0317      0.006     -5.050      0.000      -0.044      -0.019
+age2                        -0.0002   3.99e-05     -4.101      0.000      -0.000   -8.54e-05
+alpha                        0.0659      0.004     16.713      0.000       0.058       0.074
+============================================================================================
+
+Fitted formula — best-AIC NB2:
+  log E[HR_t] = log(PA_t)
+    + (-0.57986) · Intercept
+    + (+0.03500) · k_percent_lag
+    + (+0.01597) · bb_percent_lag
+    + (+5.26059) · xslg_lag
+    + (-6.87500) · xwobacon_lag
+    + (+0.02968) · exit_velocity_avg_lag
+    + (+0.02248) · barrel_batted_rate_lag
+    + (+0.02251) · solidcontact_percent_lag
+    + (-0.00989) · hard_hit_percent_lag
+    + (+0.18443) · avg_best_speed_lag
+    + (-0.25039) · avg_hyper_speed_lag
+    + (+0.00518) · swing_percent_lag
+    + (-0.03174) · sprint_speed_lag
+    + (-0.00016) · age2
+  alpha = 0.0659
+
+── Best-BIC NB2 summary ────────────────────────────────────────────────
+                     NegativeBinomial Regression Results                      
+==============================================================================
+Dep. Variable:               home_run   No. Observations:                 2337
+Model:               NegativeBinomial   Df Residuals:                     2326
+Method:                           MLE   Df Model:                           10
+Date:                Sun, 31 May 2026   Pseudo R-squ.:                 0.07755
+Time:                        20:29:09   Log-Likelihood:                -7397.6
+converged:                       True   LL-Null:                       -8019.5
+Covariance Type:            nonrobust   LLR p-value:                4.958e-261
+============================================================================================
+                               coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------
+Intercept                    2.2933      1.652      1.389      0.165      -0.944       5.530
+k_percent_lag                0.0338      0.004      8.654      0.000       0.026       0.041
+bb_percent_lag               0.0102      0.003      4.000      0.000       0.005       0.015
+xslg_lag                     5.1660      0.590      8.756      0.000       4.010       6.322
+xwobacon_lag                -6.7509      0.674    -10.015      0.000      -8.072      -5.430
+barrel_batted_rate_lag       0.0239      0.005      4.376      0.000       0.013       0.035
+solidcontact_percent_lag     0.0201      0.004      4.802      0.000       0.012       0.028
+avg_best_speed_lag           0.1792      0.023      7.923      0.000       0.135       0.224
+avg_hyper_speed_lag         -0.2475      0.040     -6.165      0.000      -0.326      -0.169
+sprint_speed_lag            -0.0332      0.006     -5.284      0.000      -0.045      -0.021
+age2                        -0.0002      4e-05     -4.316      0.000      -0.000   -9.42e-05
+alpha                        0.0671      0.004     16.859      0.000       0.059       0.075
+============================================================================================
+
+Fitted formula — best-BIC NB2:
+  log E[HR_t] = log(PA_t)
+    + (+2.29335) · Intercept
+    + (+0.03377) · k_percent_lag
+    + (+0.01022) · bb_percent_lag
+    + (+5.16599) · xslg_lag
+    + (-6.75088) · xwobacon_lag
+    + (+0.02386) · barrel_batted_rate_lag
+    + (+0.02012) · solidcontact_percent_lag
+    + (+0.17920) · avg_best_speed_lag
+    + (-0.24749) · avg_hyper_speed_lag
+    + (-0.03316) · sprint_speed_lag
+    + (-0.00017) · age2
+  alpha = 0.0671
+
+-> v3/best_subset_profile_v3.png
+-> v3/best_subset_results_v3.txt

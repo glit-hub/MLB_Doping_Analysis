@@ -1,0 +1,24 @@
+Best-subset NB2 results (v3, PA>=300, 15 candidates)
+============================================================
+Best AIC = 14805.6689  (13 predictors)
+  ['k_percent_lag', 'bb_percent_lag', 'xslg_lag', 'xwobacon_lag', 'exit_velocity_avg_lag', 'barrel_batted_rate_lag', 'solidcontact_percent_lag', 'hard_hit_percent_lag', 'avg_best_speed_lag', 'avg_hyper_speed_lag', 'swing_percent_lag', 'sprint_speed_lag', 'age2']
+
+Best BIC = 14888.2006  (10 predictors)
+  ['k_percent_lag', 'bb_percent_lag', 'xslg_lag', 'xwobacon_lag', 'barrel_batted_rate_lag', 'solidcontact_percent_lag', 'avg_best_speed_lag', 'avg_hyper_speed_lag', 'sprint_speed_lag', 'age2']
+
+Profile (best AIC/BIC by subset size):
+  k= 1: AIC=15116.76,  BIC=15134.03
+  k= 2: AIC=15051.12,  BIC=15074.15
+  k= 3: AIC=15017.31,  BIC=15046.09
+  k= 4: AIC=14936.08,  BIC=14970.62
+  k= 5: AIC=14908.98,  BIC=14949.28
+  k= 6: AIC=14881.30,  BIC=14927.36
+  k= 7: AIC=14862.44,  BIC=14914.25
+  k= 8: AIC=14846.04,  BIC=14903.61
+  k= 9: AIC=14833.08,  BIC=14896.40
+  k=10: AIC=14819.12,  BIC=14888.20
+  k=11: AIC=14815.21,  BIC=14890.05
+  k=12: AIC=14809.46,  BIC=14890.06
+  k=13: AIC=14805.67,  BIC=14892.02
+  k=14: AIC=14806.20,  BIC=14898.30
+  k=15: AIC=14808.09,  BIC=14905.95

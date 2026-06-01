@@ -1,0 +1,615 @@
+========================================================================
+1. DATA LOADING AND CLEANING
+========================================================================
+  Rows : 7,375
+  Years: 2015–2025
+  Players: 1,980
+
+========================================================================
+2. VARIABLE EXCLUSION RATIONALE
+========================================================================
+
+EXCLUDED — and why
+──────────────────────────────────────────────────────────────────────────────
+  player_name, player_id, year
+    Identifiers / time-index only; carry no physical information.
+
+  home_run
+    The RESPONSE variable.
+
+  ab, hit, single, double, triple
+    Raw counting stats that scale with PA volume and are determined by
+    the same at-bat outcomes we are trying to explain. Including them
+    would create near-tautological predictors of HR count.
+
+  strikeout, walk
+    Replaced by their RATE equivalents k_percent / bb_percent, which
+    are independent of PA volume.
+
+  on_base_plus_slg (OPS), woba, on_base_percent
+    Realized composite/rate stats that directly incorporate the home-run
+    events we are modelling.  Slugging percentage, for example, weights
+    a home run at 4×; including it would put the response on the RHS.
+
+  avg_swing_speed, blasts_contact
+    Only available for 2023–2025 (75.5 % null across the full dataset).
+    Including them as lagged predictors would restrict the sample to
+    2024–2025, losing >90 % of the data.
+
+KEPT as lagged predictors (prior-year stats, except age which is current)
+──────────────────────────────────────────────────────────────────────────────
+  Statcast "expected" stats: xslg, xwobacon
+    (v2: reduced from 7 to 2 to eliminate multicollinearity; xslg captures
+    extra-base power, xwobacon captures contact quality independent of walks)
+  Contact quality   : log1p(barrel_batted_rate) [v2: log-transformed],
+                      exit_velocity_avg, hard_hit_percent,
+                      solidcontact_percent, avg_best_speed, avg_hyper_speed
+  Plate discipline  : k_percent, bb_percent
+  Swing behaviour   : whiff_percent, swing_percent
+  Athleticism       : sprint_speed
+  Age curve control : player_age, player_age² (current year, not lagged)
+
+AGE MODELLING CHOICE
+──────────────────────────────────────────────────────────────────────────────
+  We use age + age² (quadratic) rather than age × stat interactions.
+  The quadratic form captures the smooth rise-and-fall of the MLB power
+  arc with only 2 extra degrees of freedom; age interactions with each
+  predictor would add ~18 df and risk overfitting. The stepwise search
+  can add age interactions if they genuinely help.
+
+========================================================================
+3. BUILD LAGGED-PREDICTOR DATASET
+========================================================================
+  Lagged dataset: 3,818 player-seasons (2016–2025)
+  Players        : 1,030
+  Mean HR        : 12.70  |  Median: 10  |  Max: 62
+
+========================================================================
+4. OVERDISPERSION CHECK
+========================================================================
+
+Poisson assumes Var(Y) = E[Y].  If Var >> mean, we have overdispersion
+and the Negative Binomial (which adds a free variance parameter) is more
+appropriate.
+
+  Overall HR mean        = 12.695
+  Overall HR variance    = 99.609
+  Variance / mean ratio  = 7.85
+
+A ratio of 7.8 far exceeds 1.0, indicating strong raw overdispersion.
+This partly reflects between-player heterogeneity in PA (some players have
+600 PA, others 100).  After conditioning on lagged contact-quality metrics,
+the *residual* dispersion will be lower — but likely still > 1.
+
+We will:
+  (a) Fit a Poisson GLM (our primary M_0 as requested) and check the
+      residual deviance / df ratio.
+  (b) Formally test for overdispersion using the Cameron & Trivedi (1990)
+      auxiliary regression test.
+  (c) Fit a Negative Binomial (NB2) model and compare via AIC/BIC.
+
+  Cameron & Trivedi overdispersion test (on null Poisson model):
+    slope = 0.2007,  t = 15.709,  p = 6.196e-54
+    → Overdispersion confirmed. Negative Binomial is recommended.
+
+========================================================================
+5. EXPLORATORY PLOTS
+========================================================================
+  → fig1_predictor_distributions_v2.png
+  → fig2_predictor_vs_hr_rate_v2.png
+
+  Pearson correlations with log(HR rate) — ranked:
+    log_barrel                      r = +0.435
+    avg_best_speed                  r = +0.403
+    avg_hyper_speed                 r = +0.392
+    hard_hit_percent                r = +0.371
+    exit_velocity_avg               r = +0.351
+    xwobacon                        r = +0.347
+    xslg                            r = +0.347
+    whiff_percent                   r = +0.252
+    solidcontact_percent            r = +0.246
+    k_percent                       r = +0.173
+    bb_percent                      r = +0.127
+    swing_percent                   r = +0.023
+    sprint_speed                    r = -0.086
+
+========================================================================
+6. INITIAL POISSON MODEL M_0 — PED-SENSITIVE PREDICTORS
+========================================================================
+
+Heuristic for M_0 variable selection
+─────────────────────────────────────────────────────────────────────────────
+Anabolic steroids and HGH increase lean muscle mass and neuromuscular
+efficiency, which should manifest most directly in hard-contact metrics:
+
+  barrel_batted_rate_lag  — the fraction of balls hit with ideal exit
+                            velocity AND launch angle to produce extra-
+                            base hits; arguably the single best Statcast
+                            proxy for raw power output.
+  hard_hit_percent_lag    — balls hit ≥ 95 mph EV; reflects sustained
+                            strength throughout the zone.
+  exit_velocity_avg_lag   — average exit velocity across all batted balls;
+                            boosted directly by muscle mass and bat speed.
+  xiso_lag                — expected isolated power (xSLG − xBA); captures
+                            the extra-base-hit component of contact quality,
+                            which is most tightly linked to HR potential.
+  avg_best_speed_lag      — mean of the player's top-percentile exit velos;
+                            proxy for peak raw power in the best swings.
+
+  player_age, age2        — quadratic career arc control (age + age²).
+
+These five metrics capture the physical dimensions most directly enhanced
+by strength-boosting substances.  Statcast "expected" stats capture the
+same signal from a different angle but are more collinear with each other,
+so we prefer the raw contact-quality metrics here.
+
+─── M_0 Poisson summary ───────────────────────────────────────────────
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:               home_run   No. Observations:                 3818
+Model:                            GLM   Df Residuals:                     3810
+Model Family:                 Poisson   Df Model:                            7
+Link Function:                    Log   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -11665.
+Date:                Sun, 31 May 2026   Deviance:                       8060.6
+Time:                        13:54:49   Pearson chi2:                 7.86e+03
+No. Iterations:                     5   Pseudo R-squ. (CS):             0.6663
+Covariance Type:            nonrobust                                         
+=========================================================================================
+                            coef    std err          z      P>|z|      [0.025      0.975]
+-----------------------------------------------------------------------------------------
+Intercept               -10.5664      0.550    -19.202      0.000     -11.645      -9.488
+log_barrel_lag            0.3746      0.015     25.073      0.000       0.345       0.404
+hard_hit_percent_lag     -0.0109      0.002     -6.450      0.000      -0.014      -0.008
+exit_velocity_avg_lag     0.0206      0.005      3.976      0.000       0.010       0.031
+xslg_lag                  0.1072      0.095      1.129      0.259      -0.079       0.293
+avg_best_speed_lag        0.0497      0.005      9.115      0.000       0.039       0.060
+player_age               -0.0004      0.016     -0.025      0.980      -0.031       0.031
+age2                  -4.838e-05      0.000     -0.180      0.857      -0.001       0.000
+=========================================================================================
+
+Fitted formula for M_0:
+  log E[HR_t] = log(PA_t)
+    + (-10.56637)  [Intercept]
+    + (+0.37457) · log_barrel_lag
+    + (-0.01095) · hard_hit_percent_lag
+    + (+0.02065) · exit_velocity_avg_lag
+    + (+0.10720) · xslg_lag
+    + (+0.04966) · avg_best_speed_lag
+    + (-0.00040) · player_age
+    + (-0.00005) · age2
+
+  Residual deviance / df_resid = 8060.6 / 3810 = 2.116
+  ⚠  Ratio well above 1 — overdispersion present even after conditioning on predictors. NB model is preferred.
+
+========================================================================
+7. M_0 DIAGNOSTICS
+========================================================================
+  → fig3_m0_diagnostics_v2.png
+
+  M_0 Pearson residuals: mean=-0.0513, std=1.4340
+  14.4% outside ±2  (expect ~5% under correct Poisson model)
+  Residual deviance/df = 2.116  (overdispersed)
+
+========================================================================
+8. STEPWISE VARIABLE SELECTION (Poisson GLM)
+========================================================================
+
+── AIC stepwise (Poisson) ──────────────────────────────────────────────
+  Start  AIC = 27521.46  |  vars: ['intercept only']
+  + log_barrel_lag                            AIC = 23585.09
+  + avg_best_speed_lag                        AIC = 23387.78
+  + sprint_speed_lag                          AIC = 23329.82
+  + solidcontact_percent_lag                  AIC = 23282.31
+  + hard_hit_percent_lag                      AIC = 23198.02
+  + age2                                      AIC = 23156.03
+  + bb_percent_lag                            AIC = 23143.85
+  + swing_percent_lag                         AIC = 23117.98
+  + xwobacon_lag                              AIC = 23102.03
+  + xslg_lag                                  AIC = 23089.59
+  + k_percent_lag                             AIC = 22901.40
+  + exit_velocity_avg_lag                     AIC = 22892.84
+  + avg_hyper_speed_lag                       AIC = 22885.12
+  + whiff_percent_lag                         AIC = 22881.72
+
+  AIC model: AIC = 22881.72, BIC = 22975.43
+  14 predictors: ['log_barrel_lag', 'avg_best_speed_lag', 'sprint_speed_lag', 'solidcontact_percent_lag', 'hard_hit_percent_lag', 'age2', 'bb_percent_lag', 'swing_percent_lag', 'xwobacon_lag', 'xslg_lag', 'k_percent_lag', 'exit_velocity_avg_lag', 'avg_hyper_speed_lag', 'whiff_percent_lag']
+
+── BIC stepwise (Poisson) ──────────────────────────────────────────────
+  Start  BIC = 27527.71  |  vars: ['intercept only']
+  + log_barrel_lag                            BIC = 23597.59
+  + avg_best_speed_lag                        BIC = 23406.53
+  + sprint_speed_lag                          BIC = 23354.81
+  + solidcontact_percent_lag                  BIC = 23313.55
+  + hard_hit_percent_lag                      BIC = 23235.50
+  + age2                                      BIC = 23199.76
+  + bb_percent_lag                            BIC = 23193.83
+  + swing_percent_lag                         BIC = 23174.21
+  + xwobacon_lag                              BIC = 23164.50
+  + xslg_lag                                  BIC = 23158.31
+  + k_percent_lag                             BIC = 22976.37
+  + exit_velocity_avg_lag                     BIC = 22974.05
+  + avg_hyper_speed_lag                       BIC = 22972.58
+
+  BIC model: AIC = 22885.12, BIC = 22972.58
+  13 predictors: ['log_barrel_lag', 'avg_best_speed_lag', 'sprint_speed_lag', 'solidcontact_percent_lag', 'hard_hit_percent_lag', 'age2', 'bb_percent_lag', 'swing_percent_lag', 'xwobacon_lag', 'xslg_lag', 'k_percent_lag', 'exit_velocity_avg_lag', 'avg_hyper_speed_lag']
+
+── AIC model summary ───────────────────────────────────────────────────
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:               home_run   No. Observations:                 3818
+Model:                            GLM   Df Residuals:                     3803
+Model Family:                 Poisson   Df Model:                           14
+Link Function:                    Log   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -11426.
+Date:                Sun, 31 May 2026   Deviance:                       7583.3
+Time:                        13:54:53   Pearson chi2:                 7.28e+03
+No. Iterations:                     5   Pseudo R-squ. (CS):             0.7055
+Covariance Type:            nonrobust                                         
+============================================================================================
+                               coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------
+Intercept                   -7.4056      1.367     -5.416      0.000     -10.086      -4.725
+log_barrel_lag               0.1936      0.021      9.355      0.000       0.153       0.234
+avg_best_speed_lag           0.1082      0.014      7.519      0.000       0.080       0.136
+sprint_speed_lag            -0.0262      0.004     -6.967      0.000      -0.034      -0.019
+solidcontact_percent_lag     0.0155      0.002      6.479      0.000       0.011       0.020
+hard_hit_percent_lag        -0.0130      0.002     -6.777      0.000      -0.017      -0.009
+age2                        -0.0002   2.42e-05     -6.380      0.000      -0.000      -0.000
+bb_percent_lag               0.0151      0.002      7.161      0.000       0.011       0.019
+swing_percent_lag            0.0036      0.001      2.503      0.012       0.001       0.006
+xwobacon_lag                -5.8572      0.393    -14.894      0.000      -6.628      -5.086
+xslg_lag                     4.6837      0.325     14.425      0.000       4.047       5.320
+k_percent_lag                0.0274      0.003     10.764      0.000       0.022       0.032
+exit_velocity_avg_lag        0.0237      0.006      4.209      0.000       0.013       0.035
+avg_hyper_speed_lag         -0.0938      0.030     -3.150      0.002      -0.152      -0.035
+whiff_percent_lag            0.0042      0.002      2.324      0.020       0.001       0.008
+============================================================================================
+
+Fitted formula — M_AIC (Poisson):
+  log E[HR_t] = log(PA_t)
+    + (-7.40558) · Intercept
+    + (+0.19363) · log_barrel_lag
+    + (+0.10817) · avg_best_speed_lag
+    + (-0.02618) · sprint_speed_lag
+    + (+0.01549) · solidcontact_percent_lag
+    + (-0.01304) · hard_hit_percent_lag
+    + (-0.00015) · age2
+    + (+0.01506) · bb_percent_lag
+    + (+0.00363) · swing_percent_lag
+    + (-5.85718) · xwobacon_lag
+    + (+4.68365) · xslg_lag
+    + (+0.02739) · k_percent_lag
+    + (+0.02371) · exit_velocity_avg_lag
+    + (-0.09384) · avg_hyper_speed_lag
+    + (+0.00417) · whiff_percent_lag
+
+  M_AIC deviance/df = 1.994
+
+── BIC model summary ───────────────────────────────────────────────────
+                 Generalized Linear Model Regression Results                  
+==============================================================================
+Dep. Variable:               home_run   No. Observations:                 3818
+Model:                            GLM   Df Residuals:                     3804
+Model Family:                 Poisson   Df Model:                           13
+Link Function:                    Log   Scale:                          1.0000
+Method:                          IRLS   Log-Likelihood:                -11429.
+Date:                Sun, 31 May 2026   Deviance:                       7588.7
+Time:                        13:54:53   Pearson chi2:                 7.29e+03
+No. Iterations:                     5   Pseudo R-squ. (CS):             0.7051
+Covariance Type:            nonrobust                                         
+============================================================================================
+                               coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------
+Intercept                   -7.7449      1.361     -5.691      0.000     -10.412      -5.078
+log_barrel_lag               0.1973      0.021      9.565      0.000       0.157       0.238
+avg_best_speed_lag           0.1099      0.014      7.636      0.000       0.082       0.138
+sprint_speed_lag            -0.0262      0.004     -6.985      0.000      -0.034      -0.019
+solidcontact_percent_lag     0.0154      0.002      6.457      0.000       0.011       0.020
+hard_hit_percent_lag        -0.0135      0.002     -7.043      0.000      -0.017      -0.010
+age2                        -0.0002   2.42e-05     -6.267      0.000      -0.000      -0.000
+bb_percent_lag               0.0163      0.002      8.019      0.000       0.012       0.020
+swing_percent_lag            0.0052      0.001      4.007      0.000       0.003       0.008
+xwobacon_lag                -5.8600      0.393    -14.911      0.000      -6.630      -5.090
+xslg_lag                     4.6888      0.324     14.453      0.000       4.053       5.325
+k_percent_lag                0.0306      0.002     14.383      0.000       0.026       0.035
+exit_velocity_avg_lag        0.0232      0.006      4.129      0.000       0.012       0.034
+avg_hyper_speed_lag         -0.0920      0.030     -3.086      0.002      -0.150      -0.034
+============================================================================================
+
+Fitted formula — M_BIC (Poisson):
+  log E[HR_t] = log(PA_t)
+    + (-7.74493) · Intercept
+    + (+0.19734) · log_barrel_lag
+    + (+0.10986) · avg_best_speed_lag
+    + (-0.02625) · sprint_speed_lag
+    + (+0.01543) · solidcontact_percent_lag
+    + (-0.01349) · hard_hit_percent_lag
+    + (-0.00015) · age2
+    + (+0.01631) · bb_percent_lag
+    + (+0.00517) · swing_percent_lag
+    + (-5.85999) · xwobacon_lag
+    + (+4.68880) · xslg_lag
+    + (+0.03061) · k_percent_lag
+    + (+0.02324) · exit_velocity_avg_lag
+    + (-0.09201) · avg_hyper_speed_lag
+
+========================================================================
+9. LIKELIHOOD RATIO TESTS (LRT) — DROP-ONE FROM M_AIC (POISSON)
+========================================================================
+
+For each predictor in M_AIC we test
+  H₀ : the model without that variable fits equally well
+  H₁ : the full M_AIC
+
+  LRT = 2(ℓ_full − ℓ_reduced)  ~  χ²(1)  under H₀
+
+A variable with p < 0.05 significantly improves the model and should
+be kept; a non-significant variable could potentially be removed.
+
+  Variable                                        LRT      p-value  Sig
+  ────────────────────────────────────────────────────────────────────
+  log_barrel_lag                                90.11    2.257e-21  ***
+  avg_best_speed_lag                            59.52    1.211e-14  ***
+  sprint_speed_lag                              48.37    3.533e-12  ***
+  solidcontact_percent_lag                      41.81    1.008e-10  ***
+  hard_hit_percent_lag                          45.71    1.373e-11  ***
+  age2                                          40.90    1.599e-10  ***
+  bb_percent_lag                                51.03    9.119e-13  ***
+  swing_percent_lag                              6.26      0.01236  *
+  xwobacon_lag                                 221.18    4.995e-50  ***
+  xslg_lag                                     205.90    1.075e-46  ***
+  k_percent_lag                                113.94    1.344e-26  ***
+  exit_velocity_avg_lag                         17.85    2.395e-05  ***
+  avg_hyper_speed_lag                           10.13     0.001459  **
+  whiff_percent_lag                              5.40      0.02018  *
+
+  Significance codes: *** p<0.001  ** p<0.01  * p<0.05
+
+  All variables in M_AIC are significant at α=0.05 by LRT.
+
+========================================================================
+10. NEGATIVE BINOMIAL (NB2) REGRESSION
+========================================================================
+
+Given the overdispersion detected above, we now fit Negative Binomial
+(NB2) models using the same variable sets from M_0 and M_AIC.
+
+The NB2 model adds a free dispersion parameter α such that
+  Var(Y) = μ + α · μ²
+When α → 0, NB2 reduces to Poisson; α > 0 indicates extra-Poisson
+variance (overdispersion).
+
+We test Poisson vs NB2 using a boundary LRT:
+  LRT = 2(ℓ_NB − ℓ_Poisson) ~ 0.5·χ²(0) + 0.5·χ²(1)  under H₀(Poisson)
+  → p-value ≈ 0.5 · P(χ²(1) > LRT)
+
+  Fitting NB2 models …
+
+  M_0   NB2:  AIC = 22154.64,  BIC = 22210.86,  α = 0.0853
+  M_AIC NB2:  AIC = 21890.36,  BIC = 21990.32,  α = 0.0743
+  M_BIC NB2:  AIC = 21894.01,  BIC = 21987.72,  α = 0.0743
+
+  Poisson vs NB2 LRT (boundary-corrected):
+  M_0                   LRT = 1192.38,  boundary p = 1.379e-261 → NB preferred
+  M_AIC                 LRT = 993.36,  boundary p = 2.486e-218 → NB preferred
+  M_BIC                 LRT = 993.11,  boundary p = 2.824e-218 → NB preferred
+
+── M_AIC NB2 summary ───────────────────────────────────────────────────
+                     NegativeBinomial Regression Results                      
+==============================================================================
+Dep. Variable:               home_run   No. Observations:                 3818
+Model:               NegativeBinomial   Df Residuals:                     3803
+Method:                           MLE   Df Model:                           14
+Date:                Sun, 31 May 2026   Pseudo R-squ.:                 0.07478
+Time:                        13:54:53   Log-Likelihood:                -10929.
+converged:                      False   LL-Null:                       -11813.
+Covariance Type:            nonrobust   LLR p-value:                     0.000
+============================================================================================
+                               coef    std err          z      P>|z|      [0.025      0.975]
+--------------------------------------------------------------------------------------------
+Intercept                   -8.9662      1.899     -4.722      0.000     -12.688      -5.245
+log_barrel_lag               0.1568      0.027      5.891      0.000       0.105       0.209
+avg_best_speed_lag           0.0938      0.019      4.927      0.000       0.056       0.131
+sprint_speed_lag            -0.0278      0.005     -5.152      0.000      -0.038      -0.017
+solidcontact_percent_lag     0.0136      0.003      4.042      0.000       0.007       0.020
+hard_hit_percent_lag        -0.0129      0.003     -4.695      0.000      -0.018      -0.008
+age2                        -0.0002   3.52e-05     -4.566      0.000      -0.000   -9.18e-05
+bb_percent_lag               0.0158      0.003      5.187      0.000       0.010       0.022
+swing_percent_lag            0.0035      0.002      1.681      0.093      -0.001       0.008
+xwobacon_lag                -6.6304      0.557    -11.901      0.000      -7.722      -5.538
+xslg_lag                     5.3814      0.464     11.600      0.000       4.472       6.291
+k_percent_lag                0.0299      0.004      8.528      0.000       0.023       0.037
+exit_velocity_avg_lag        0.0200      0.008      2.621      0.009       0.005       0.035
+avg_hyper_speed_lag         -0.0583      0.039     -1.482      0.138      -0.135       0.019
+whiff_percent_lag            0.0060      0.003      2.377      0.017       0.001       0.011
+alpha                        0.0743      0.004     18.740      0.000       0.067       0.082
+============================================================================================
+
+Fitted formula — M_AIC (NB2):
+  log E[HR_t] = log(PA_t)
+    + (-8.96622) · Intercept
+    + (+0.15680) · log_barrel_lag
+    + (+0.09380) · avg_best_speed_lag
+    + (-0.02782) · sprint_speed_lag
+    + (+0.01359) · solidcontact_percent_lag
+    + (-0.01290) · hard_hit_percent_lag
+    + (-0.00016) · age2
+    + (+0.01578) · bb_percent_lag
+    + (+0.00349) · swing_percent_lag
+    + (-6.63042) · xwobacon_lag
+    + (+5.38136) · xslg_lag
+    + (+0.02994) · k_percent_lag
+    + (+0.01999) · exit_velocity_avg_lag
+    + (-0.05835) · avg_hyper_speed_lag
+    + (+0.00600) · whiff_percent_lag
+  Dispersion parameter  α = 0.0743  [Var(Y|X) = μ + 0.0743·μ²]
+
+  M_AIC NB2 McFadden pseudo-R² = 0.0748
+
+  NOTE: Several x-stat predictors are highly correlated (xba, xslg, xiso,
+  xwoba, xwobacon, xbacon).  The large opposing coefficients suggest
+  multicollinearity.  Treat individual p-values for these terms with caution;
+  the model's overall fit and outlier detection remain valid.
+
+========================================================================
+11. BRIER SCORES
+========================================================================
+
+Adapting the Brier score to a count-response model
+───────────────────────────────────────────────────
+The Brier score requires a binary event and a predicted probability.
+We define:
+
+    Event  E_i = 1  if player i HIT MORE HRs than predicted
+               = 0  otherwise
+    i.e.  E_i = 𝟙[ HR_i > floor(μ̂_i) ]
+
+Predicted probability (Poisson):
+    p_i = P(HR > floor(μ̂_i) | λ = μ̂_i)
+        = 1 − Poisson_CDF( floor(μ̂_i) ; μ̂_i )
+
+Predicted probability (NB2):
+    p_i = 1 − NB_CDF( floor(μ̂_i) ; r=1/α, p=1/(1+α·μ̂_i) )
+
+Brier score = mean[ (p_i − E_i)² ]     (lower = better; 0.25 = random)
+
+  Model                         Brier         AIC         BIC     k   disp/df
+  ────────────────────────────────────────────────────────────────────────
+  NOTE: BIC uses the standard formula -2*llf + k*log(n) for all models.
+  Model                         Brier         AIC         BIC     k   stat     value
+  --------------------------------------------------------------------------
+  Null (mean rate)            0.24559    27521.46    27527.71     1  disp/df         —
+  M_0  Poisson                0.24555    23345.02    23395.00     7  disp/df     2.116
+  M_AIC Poisson               0.24624    22881.72    22975.43    14  disp/df     1.994
+  M_BIC Poisson               0.24587    22885.12    22972.58    13  disp/df     1.995
+  M_0  NB2                    0.24550    22154.64    22210.86     8    pR2    0.0630
+  M_AIC NB2                   0.24590    21890.36    21990.32    15    pR2    0.0748
+  M_BIC NB2                   0.24572    21894.01    21987.72    14    pR2    0.0745
+
+  Brier: lower = better calibration (0.25 = random coin flip).
+  AIC/BIC: lower = better penalised fit.
+  disp/df (Poisson): ~1.0 ideal; >>1 = overdispersion.
+  pR2 (NB2): McFadden pseudo-R² = 1 - llf/llnull; higher = better.
+
+========================================================================
+12. OUTLIER IDENTIFICATION — M_AIC NB2 MODEL
+========================================================================
+
+We use the M_AIC NB2 model as our preferred specification (NB2
+accounts for overdispersion; AIC-selected variables are the most
+informative).
+
+Outliers are flagged by large STANDARDISED Pearson residuals:
+
+    r_P = (y − μ̂) / sqrt(Var̂(Y))
+
+For NB2: Var̂(Y_i) = μ̂_i + α · μ̂_i²
+
+  NB Pearson residuals (n=3818): mean=-0.029, std=1.022, min=-2.57, max=5.45
+Player-seasons with |NB Pearson residual| > 2.5:
+
+  Player                      Year  Age    PA  Actual HR  Predicted  NB Pearson R
+  ────────────────────────────────────────────────────────────────────────────
+  Olson, Matt                 2017   23   216         24        6.7      +5.45 ↑ HIGH
+  O'Hoppe, Logan              2023   23   199         14        3.7      +4.76 ↑ HIGH
+  Garver, Mitch               2019   28   359         31       11.0      +4.47 ↑ HIGH
+  Gurriel, Yuli               2019   35   612         31       11.1      +4.43 ↑ HIGH
+  Chang, Yu                   2021   25   251          9        2.1      +4.36 ↑ HIGH
+  Polanco, Jorge              2021   27   644         33       12.4      +4.21 ↑ HIGH
+  Martínez, José A.           2017   28   307         14        4.3      +4.09 ↑ HIGH
+  Suzuki, Kurt                2017   33   309         19        6.6      +3.92 ↑ HIGH
+  Gardner, Brett              2019   35   550         28       10.9      +3.85 ↑ HIGH
+  Palacios, Joshua            2023   27   264         10        2.9      +3.74 ↑ HIGH
+  La Stella, Tommy            2019   30   321         16        5.7      +3.63 ↑ HIGH
+  Semien, Marcus              2021   30   724         45       20.0      +3.56 ↑ HIGH
+  Calhoun, Willie             2019   24   337         21        8.2      +3.54 ↑ HIGH
+  Kinsler, Ian                2016   34   679         28       11.7      +3.50 ↑ HIGH
+  Carpenter, Matt             2022   36   154         15        5.5      +3.38 ↑ HIGH
+  Wade Jr., LaMonte           2021   27   381         18        7.1      +3.31 ↑ HIGH
+  Dozier, Brian               2016   29   691         42       19.5      +3.25 ↑ HIGH
+  Gregorius, Didi             2018   28   569         27       11.8      +3.24 ↑ HIGH
+  Palacios, Richie            2023   26   102          6        1.6      +3.20 ↑ HIGH
+  Outman, James               2023   26   567         23        9.9      +3.15 ↑ HIGH
+  Culberson, Charlie          2018   29   322         12        4.4      +3.15 ↑ HIGH
+  Suzuki, Kurt                2019   35   309         17        6.9      +3.10 ↑ HIGH
+  Fairchild, Stuart           2022   26   110          5        1.3      +3.09 ↑ HIGH
+  Altuve, Jose                2019   29   548         31       14.3      +3.08 ↑ HIGH
+  Siri, Jose                  2023   27   364         25       11.2      +3.06 ↑ HIGH
+  Gregorius, Didi             2017   27   569         25       11.2      +3.06 ↑ HIGH
+  Trout, Mike                 2022   30   499         40       19.2      +3.05 ↑ HIGH
+  Marisnick, Jake             2017   26   259         16        6.6      +3.01 ↑ HIGH
+  Farmer, Kyle                2019   28   197          9        3.1      +3.00 ↑ HIGH
+  Vázquez, Christian          2019   28   521         23       10.3      +2.99 ↑ HIGH
+  Ohtani, Shohei              2021   26   639         46       22.7      +2.98 ↑ HIGH
+  Martinez, J.D.              2017   29   489         45       22.4      +2.93 ↑ HIGH
+  Flores, Wilmer              2016   24   335         16        6.7      +2.93 ↑ HIGH
+  Gyorko, Jedd                2016   27   438         30       14.2      +2.93 ↑ HIGH
+  Meadows, Austin             2019   24   591         33       15.9      +2.92 ↑ HIGH
+  Paredes, Isaac              2022   23   381         20        8.9      +2.91 ↑ HIGH
+  Suárez, Eugenio             2025   33   657         49       24.7      +2.91 ↑ HIGH
+  Buxton, Byron               2020   26   135         13        5.2      +2.90 ↑ HIGH
+  Bruce, Jay                  2019   32   333         26       12.1      +2.89 ↑ HIGH
+  Blackmon, Charlie           2016   29   641         29       13.9      +2.86 ↑ HIGH
+  Turner, Trea                2016   23   324         13        5.3      +2.81 ↑ HIGH
+  Ramírez, José               2017   24   645         29       14.0      +2.81 ↑ HIGH
+  Velázquez, Nelson           2023   24   179         17        7.4      +2.81 ↑ HIGH
+  Varsho, Daulton             2025   28   271         20        9.1      +2.80 ↑ HIGH
+  Gennett, Scooter            2017   27   497         27       13.0      +2.79 ↑ HIGH
+  Dietrich, Derek             2019   29   306         19        8.6      +2.76 ↑ HIGH
+  Cozart, Zack                2017   31   507         24       11.5      +2.72 ↑ HIGH
+  Murphy, Tom                 2019   28   281         18        8.2      +2.70 ↑ HIGH
+  Pollock, AJ                 2020   32   210         16        7.1      +2.69 ↑ HIGH
+  Ramírez, José               2018   25   698         39       20.1      +2.67 ↑ HIGH
+  Pence, Hunter               2019   36   316         18        8.3      +2.64 ↑ HIGH
+  Cooper, Garrett             2019   28   421         15        6.7      +2.62 ↑ HIGH
+  Hill, Derek                 2024   28   172          7        2.5      +2.59 ↑ HIGH
+  García, Avisaíl             2021   30   515         29       14.7      +2.58 ↑ HIGH
+  Yelich, Christian           2019   27   580         44       23.4      +2.57 ↑ HIGH
+  Gattis, Evan                2016   29   499         32       16.5      +2.57 ↑ HIGH
+  Flores, Wilmer              2020   28   213         12        5.2      +2.55 ↑ HIGH
+  Rosales, Adam               2016   33   248         13        5.8      +2.53 ↑ HIGH
+  Narváez, Omar               2019   27   482         22       10.8      +2.52 ↑ HIGH
+  Beltré, Adrian              2016   37   640         32       16.6      +2.52 ↑ HIGH
+  Altuve, Jose                2021   31   678         31       16.1      +2.52 ↑ HIGH
+  Raleigh, Cal                2025   28   705         60       33.1      +2.51 ↑ HIGH
+  Tomás, Yasmany              2016   25   563         31       16.1      +2.51 ↑ HIGH
+  Hernández, César            2022   32   617          1       16.8      -2.57 ↓ LOW
+
+  → fig4_outliers_v2.png
+  → fig5_nb_diagnostics_v2.png
+
+  M_AIC NB2: 4.4% of NB Pearson residuals outside ±2
+
+========================================================================
+SUMMARY — ALL MODELS
+========================================================================
+
+  Model                             AIC        BIC*     Brier    fit stat     k
+  * BIC = -2·llf + k·log(n)  (standard formula)
+  --------------------------------------------------------------------------
+  Null Poisson                 27521.46    27527.71   0.24559   disp/df=—     1
+  M_0  Poisson                 23345.02    23395.00   0.24555  disp/df=2.12     7
+  M_AIC Poisson                22881.72    22975.43   0.24624  disp/df=1.99    14
+  M_BIC Poisson                22885.12    22972.58   0.24587  disp/df=1.99    13
+  M_0  NB2                     22154.64    22210.86   0.24550   pR2=0.063     8
+  M_AIC NB2                    21890.36    21990.32   0.24590   pR2=0.075    15
+  M_BIC NB2                    21894.01    21987.72   0.24572   pR2=0.075    14
+
+Interpretation notes
+────────────────────
+  * AIC/BIC both penalise log-likelihood for model complexity — lower is better.
+  * Brier score measures calibration of the probability forecast for the
+    event "player exceeded expected HRs" — lower is better; 0.25 = random.
+  * disp/df = residual deviance / df_residual; should be ≈ 1 for Poisson,
+    less important for NB2 (which has its own dispersion parameter).
+  * The preferred model is M_AIC NB2 (or M_BIC NB2 if parsimony is valued).
+
+Output figures
+──────────────
+  fig1_predictor_distributions_v2.png  – histograms of all lagged predictors
+  fig2_predictor_vs_hr_rate_v2.png     – scatter plots vs log(HR rate)
+  fig3_m0_diagnostics_v2.png           – 6-panel diagnostics for M_0 (Poisson)
+  fig4_outliers_v2.png                 – actual vs predicted + residual plot
+  fig5_nb_diagnostics_v2.png           – Q-Q and residual plots for M_AIC NB2
+
